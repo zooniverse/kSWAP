@@ -224,7 +224,7 @@ class SWAP(object):
              (0, ujson.dumps(self.config.user_default), self.config.workflow,
               self.config.p0, self.config.gamma, self.config.retirement_limit,
               self.config.db_path, self.config.db_name, self.timeout,
-              self.last_id, ujson.dumps(self.seen)))
+              self.last_id, ujson.dumps(list(self.seen))))
     
     conn.commit()
     conn.close()
