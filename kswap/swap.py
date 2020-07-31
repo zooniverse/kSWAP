@@ -1,6 +1,6 @@
 import os
 import csv
-import ujson
+import json
 import sqlite3
 
 class Classification(object):
@@ -50,9 +50,9 @@ class User(object):
   
   def dump(self):
     return (self.user_id,
-            ujson.dumps(self.user_score),
-            ujson.dumps(self.confusion_matrix),
-            ujson.dumps(self.history))
+            json.dumps(self.user_score),
+            json.dumps(self.confusion_matrix),
+            json.dumps(self.history))
 
 class Subject(object):
   def __init__(self,
@@ -101,7 +101,7 @@ class Subject(object):
             self.retired, \
             self.retired_as, \
             self.seen, \
-            ujson.dumps(self.history))
+            json.dumps(self.history))
 
 class SWAP(object):
   def __init__(self,
@@ -118,6 +118,7 @@ class SWAP(object):
     self.timeout = timeout # wait x seconds to acquire db connection
     try:
       self.create_db()
+      self.save()
     except sqlite3.OperationalError:
       self.db_exists = True
       
@@ -142,12 +143,12 @@ class SWAP(object):
 
   def load_users(self, users):
     for user in users:
-      user_score = ujson.loads(user['user_score'])
+      user_score = json.loads(user['user_score'])
       self.users[user['user_id']] = User(user_id=user['user_id'],
                                          classes=self.config.classes,
                                          user_default=user_score)
-      self.users[user['user_id']].confusion_matrix = ujson.loads(user['confusion_matrix'])
-      self.users[user['user_id']].history = ujson.loads(user['history'])
+      self.users[user['user_id']].confusion_matrix = json.loads(user['confusion_matrix'])
+      self.users[user['user_id']].history = json.loads(user['history'])
 
   def load_subjects(self, subjects):
     for subject in subjects:
@@ -159,7 +160,7 @@ class SWAP(object):
       self.subjects[subject['subject_id']].retired = subject['retired']
       self.subjects[subject['subject_id']].retired_as = subject['retired_as']
       self.subjects[subject['subject_id']].seen = subject['seen']
-      self.subjects[subject['subject_id']].history = ujson.loads(subject['history'])
+      self.subjects[subject['subject_id']].history = json.loads(subject['history'])
 
   def load(self):
     def it(rows):
@@ -177,7 +178,7 @@ class SWAP(object):
                 timeout=config['timeout'])
                   
     swap.last_id = config['last_id']
-    swap.seen = set(ujson.loads(config['seen']))
+    swap.seen = set(json.loads(config['seen']))
   
     c.execute('SELECT * FROM users')
     swap.load_users(it(c.fetchall()))
@@ -217,19 +218,22 @@ class SWAP(object):
     c.executemany('INSERT OR REPLACE INTO users VALUES (?,?,?,?)',
                   self.dump_users())
 
-    c.executemany('REPLACE INTO subjects VALUES (?,?,?,?,?,?,?)',
+    c.executemany('INSERT OR REPLACE INTO subjects VALUES (?,?,?,?,?,?,?)',
                     self.dump_subjects())
 
     c.execute('INSERT OR REPLACE INTO config VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-             (0, ujson.dumps(self.config.user_default), self.config.workflow,
+             (0, json.dumps(self.config.user_default), self.config.workflow,
               self.config.p0, self.config.gamma, self.config.retirement_limit,
               self.config.db_path, self.config.db_name, self.timeout,
-              self.last_id, ujson.dumps(list(self.seen))))
+              self.last_id, json.dumps(list(self.seen))))
     
     conn.commit()
     conn.close()
 
   def process_classification(self, cl, online=False):
+    # check if classification already seen
+    if cl.id <= self.last_id:
+      return
     # check user is known
     try:
       self.users[cl.user_id]
@@ -265,7 +269,9 @@ class SWAP(object):
 
       self.users[cl.user_id].user_score = {self.config.classes[0]: score0, self.config.classes[1]: score1}
     self.users[cl.user_id].history.append((cl.subject_id, self.users[cl.user_id].user_score))
-
+    self.last_id = cl.id
+    self.seen.add(cl.id)
+    
   def retire(self, subject_batch):
     to_retire = []
     for subject_id in subject_batch:
@@ -314,7 +320,7 @@ class SWAP(object):
         try:
           assert int(row['workflow_id']) == self.config.workflow
           # ignore repeat classifications of the same subject
-          ujson.loads(row['metadata'])['seen_before']
+          json.loads(row['metadata'])['seen_before']
           continue
         except KeyError as e:
           pass
@@ -326,7 +332,7 @@ class SWAP(object):
         except ValueError:
           user_id = row['user_name']
         subject_id = int(row['subject_ids'])
-        annotation = ujson.loads(row['annotations'])
+        annotation = json.loads(row['annotations'])
         try:
           cl = Classification(id,
                               user_id,
@@ -336,8 +342,6 @@ class SWAP(object):
         except ValueError:
           continue
         self.process_classification(cl, online)
-        self.last_id = id
-        self.seen.add(id)
     try:
       self.retire(self.subjects.keys())
     except TypeError:
@@ -364,7 +368,7 @@ class SWAP(object):
         except ValueError:
           user_id = row['user_name']
         subject_id = int(row['subject_ids'])
-        annotation = ujson.loads(row['annotations'])
+        annotation = json.loads(row['annotations'])
         try:
           cl = Classification(id,
                               user_id,
