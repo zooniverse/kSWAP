@@ -135,15 +135,16 @@ class SWAP(object):
     conn.execute('CREATE TABLE thresholds (thresholds)')
 
     conn.execute('CREATE TABLE config (id PRIMARY KEY, user_default, ' +\
-                 'workflow_id, p0, gamma, retirement_limit, db_path, ' +\
+                 'workflow, p0, gamma, retirement_limit, db_path, ' +\
                  'db_name, timeout, last_id, seen)')
 
     conn.close()
 
   def load_users(self, users):
     for user in users:
-      score = ujson.loads(user['user_score'])
+      user_score = ujson.loads(user['user_score'])
       self.users[user['user_id']] = User(user_id=user['user_id'],
+                                         classes=self.config.classes,
                                          user_default=user_score)
       self.users[user['user_id']].confusion_matrix = ujson.loads(user['confusion_matrix'])
       self.users[user['user_id']].history = ujson.loads(user['history'])
@@ -168,33 +169,30 @@ class SWAP(object):
     conn = self.connect_db()
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    try:
-      c.execute('SELECT * FROM config')
-      config = dict(c.fetchone())
+    #try:
+    c.execute('SELECT * FROM config')
+    config = dict(c.fetchone())
                  
-      swap = SWAP(user_default=ujson.loads(config['user_default']),
-                  p0=config['p0'],
-                  gamma=config['gamma'],
-                  retirement_limit=config['retirement_limit'],
-                  db_path=config['db_path'],
-                  db_name=config['db_name'])
+    swap = SWAP(config=self.config,
+                timeout=config['timeout'])
                   
-      swap.last_id = config['last_id']
-      swap.seen = set(ujson.loads(config['seen']))
+    swap.last_id = config['last_id']
+    swap.seen = set(ujson.loads(config['seen']))
   
-      c.execute('SELECT * FROM users')
-      swap.load_users(it(c.fetchall()))
+    c.execute('SELECT * FROM users')
+    swap.load_users(it(c.fetchall()))
+    
+    c.execute('SELECT * FROM subjects')
+    swap.load_subjects(it(c.fetchall()))
       
-      c.execute('SELECT * FROM subjects')
-      swap.load_subjects(it(c.fetchall()))
-      
-    except TypeError as e:
-      swap = SWAP(config=self.config)
-                  
-      swap.last_id = self.last_id
-      swap.seen = self.seen
-      c.execute('SELECT * FROM subjects')
-      swap.load_subjects(it(c.fetchall()))
+    #except TypeError as e:
+    #  print(e)
+    #  swap = SWAP(config=self.config)
+    #
+    #  swap.last_id = self.last_id
+    #  swap.seen = self.seen
+    #  c.execute('SELECT * FROM subjects')
+    #  swap.load_subjects(it(c.fetchall()))
 
     conn.close()
 
@@ -225,33 +223,30 @@ class SWAP(object):
     def zip_name(data):
       return [d.values() for d in data]
 
-    if self.db_exists:
-      c.executemany('INSERT OR REPLACE INTO users VALUES (?,?,?,?)',
-                    self.dump_users())
+    #if self.db_exists:
+    c.executemany('INSERT OR REPLACE INTO users VALUES (?,?,?,?)',
+                  self.dump_users())
 
-      c.executemany('REPLACE INTO subjects VALUES (?,?,?,?,?,?,?)',
-                    self.dump_subjects())
-    
-    else:
-      c.executemany('INSERT INTO users VALUES (?,?,?,?)',
-                    self.dump_users())
-    
-      c.executemany('INSERT INTO subjects VALUES (?,?,?,?,?,?,?)',
+    c.executemany('REPLACE INTO subjects VALUES (?,?,?,?,?,?,?)',
                     self.dump_subjects())
 
-      c.execute('INSERT INTO config VALUES (?,?,?,?,?,?,?,?,?)',
-               (0, ujson.dumps(self.config.user_default), self.configp0, self.configgamma, self.config.retirement_limit, self.config.db_path, self.config.db_name, self.last_id, ujson.dumps(self.seen)))
+    c.execute('INSERT OR REPLACE INTO config VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+             (0, ujson.dumps(self.config.user_default), self.config.workflow,
+              self.config.p0, self.config.gamma, self.config.retirement_limit,
+              self.config.db_path, self.config.db_name, self.timeout,
+              self.last_id, ujson.dumps(self.seen)))
+    
+    #else:
+    #  c.executemany('INSERT INTO users VALUES (?,?,?,?)',
+    #                self.dump_users())
+    
+    #  c.executemany('INSERT INTO subjects VALUES (?,?,?,?,?,?,?)',
+    #                self.dump_subjects())
     
     conn.commit()
     conn.close()
 
   def process_classification(self, cl, online=False):
-    def zip_name(data):
-      return [d.values() for d in data]
-    
-    def it(rows):
-      for item in rows:
-        yield dict(item)
     # check user is known
     try:
       self.users[cl.user_id]
@@ -269,24 +264,24 @@ class SWAP(object):
 
 
     self.subjects[cl.subject_id].update_score(cl.label, self.users[cl.user_id])
-    self.users[cl.user_id].history.append((cl.subject_id, self.users[cl.user_id].user_score))
 
     if self.subjects[cl.subject_id].gold_label in (0,1) and online:
       gold_label = self.subjects[cl.subject_id].gold_label
       confusion_matrix = self.users[cl.user_id].confusion_matrix
-      confusion_matrix['n_seen'][gold_label] += 1
+      confusion_matrix['n_gold'][gold_label] += 1
       if gold_label == cl.label:
         confusion_matrix['n_seen'][cl.label] += 1
       try:
-        score0=(confusion_matrix['n_seen'][0] + self.config.gamma) / (confusion_matrix['n_seen'][0] + 2.0*self.config.gamma)
+        score0=(confusion_matrix['n_seen'][0] + self.config.gamma) / (confusion_matrix['n_gold'][0] + 2.0*self.config.gamma)
       except ZeroDivisionError:
         score0=self.user_default[self.config.classes[0]]
       try:
-        score1=(confusion_matrix['n_seen'][1] + self.config.gamma) / (confusion_matrix['n_seen'][1] + 2.0*self.config.gamma)
+        score1=(confusion_matrix['n_seen'][1] + self.config.gamma) / (confusion_matrix['n_gold'][1] + 2.0*self.config.gamma)
       except ZeroDivisionError:
         score1=self.user_default[self.config.classes[1]]
 
       self.users[cl.user_id].user_score = {self.config.classes[0]: score0, self.config.classes[1]: score1}
+    self.users[cl.user_id].history.append((cl.subject_id, self.users[cl.user_id].user_score))
 
   def retire(self, subject_batch):
     to_retire = []
@@ -357,7 +352,7 @@ class SWAP(object):
                               label_map=self.config.label_map)
         except ValueError:
           continue
-        self.process_classification(cl, online=online)
+        self.process_classification(cl, online)
         self.last_id = id
         self.seen.add(id)
     try:
