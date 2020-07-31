@@ -169,7 +169,7 @@ class SWAP(object):
     conn = self.connect_db()
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    #try:
+
     c.execute('SELECT * FROM config')
     config = dict(c.fetchone())
                  
@@ -184,15 +184,6 @@ class SWAP(object):
     
     c.execute('SELECT * FROM subjects')
     swap.load_subjects(it(c.fetchall()))
-      
-    #except TypeError as e:
-    #  print(e)
-    #  swap = SWAP(config=self.config)
-    #
-    #  swap.last_id = self.last_id
-    #  swap.seen = self.seen
-    #  c.execute('SELECT * FROM subjects')
-    #  swap.load_subjects(it(c.fetchall()))
 
     conn.close()
 
@@ -223,7 +214,6 @@ class SWAP(object):
     def zip_name(data):
       return [d.values() for d in data]
 
-    #if self.db_exists:
     c.executemany('INSERT OR REPLACE INTO users VALUES (?,?,?,?)',
                   self.dump_users())
 
@@ -235,13 +225,6 @@ class SWAP(object):
               self.config.p0, self.config.gamma, self.config.retirement_limit,
               self.config.db_path, self.config.db_name, self.timeout,
               self.last_id, ujson.dumps(self.seen)))
-    
-    #else:
-    #  c.executemany('INSERT INTO users VALUES (?,?,?,?)',
-    #                self.dump_users())
-    
-    #  c.executemany('INSERT INTO subjects VALUES (?,?,?,?,?,?,?)',
-    #                self.dump_subjects())
     
     conn.commit()
     conn.close()
