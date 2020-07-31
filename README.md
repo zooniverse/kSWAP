@@ -7,15 +7,16 @@ Currently only tested with python 3.8.
 
 Package requirements:
 
+```python
 sqlite3
 matplotlib
-
+```
 ## Testing
 
 Running:
 
 ```
-  python run.py
+$ python run.py
 ```
 
 will run tests of offline and a simulation of online SWAP.  It will also produce a plot showing a comparison of an example user score based on the offline and online versions.
