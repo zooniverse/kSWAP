@@ -23,7 +23,7 @@ will run tests of offline and a simulation of online SWAP and kSWAP.  It will al
 
 ## Notes
 The example config files allow for some customisation.  They are currently implemented for the [Supernova Hunters](https://www.zooniverse.org/projects/dwright04/supernova-hunters) citizen science project, where volunteers are asked a binary question with a yes or no response.
-<img src="https://github.com/dr-darryl-wright/kSWAP/blob/master/swap_example_volunteer_history.png" width="500" height="500">
+<img src="https://github.com/dr-darryl-wright/kSWAP/blob/master/swap_example_volunteer_history.png" width="500">
 
 The kSWAP tests use artificially generated data where simulated volunteers annotations '0', '1' or '2'.  The ```generate_kswap_demo_data.py``` script allows the competence of these simulated volunteers to be altered.
-<img src="https://github.com/dr-darryl-wright/kSWAP/blob/master/kswap_example_volunteer_history.png" width="500" height="500">
+<img src="https://github.com/dr-darryl-wright/kSWAP/blob/master/kswap_example_volunteer_history.png" width="500">
