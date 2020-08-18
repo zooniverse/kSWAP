@@ -40,8 +40,11 @@ class User(object):
       self.user_score = user_default
     else:
       self.initialise_user_score()
-    self.confusion_matrix = {'n_seen': [0]*self.k, 'n_gold': [0]*self.k}
+    self.initialise_confusion_matrix()
     self.history = [('_', self.user_score)]
+  
+  def initialise_confusion_matrix(self):
+      self.confusion_matrix = {'n_seen': [0]*self.k, 'n_gold': [0]*self.k}
   
   def initialise_user_score(self):
     self.user_score = {}
@@ -97,7 +100,7 @@ class Subject(object):
   def dump(self):
     return (self.subject_id, \
             self.gold_label, \
-            self.score, \
+            json.dumps(self.score), \
             self.retired, \
             self.retired_as, \
             self.seen, \
@@ -208,6 +211,12 @@ class SWAP(object):
       objects.append(self.objects[o].dump())
     return objects
 
+  def dump_config(self):
+    return (0, json.dumps(self.config.user_default), self.config.workflow,
+            self.config.p0, self.config.gamma, self.config.retirement_limit,
+            self.config.db_path, self.config.db_name, self.timeout,
+            self.last_id, json.dumps(list(self.seen)))
+              
   def save(self):
     conn = self.connect_db()
     c = conn.cursor()
@@ -216,16 +225,14 @@ class SWAP(object):
       return [d.values() for d in data]
 
     c.executemany('INSERT OR REPLACE INTO users VALUES (?,?,?,?)',
-                  self.dump_users())
+                   self.dump_users())
 
     c.executemany('INSERT OR REPLACE INTO subjects VALUES (?,?,?,?,?,?,?)',
-                    self.dump_subjects())
-
+                   self.dump_subjects())
+                   
+    print(self.dump_config())
     c.execute('INSERT OR REPLACE INTO config VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-             (0, json.dumps(self.config.user_default), self.config.workflow,
-              self.config.p0, self.config.gamma, self.config.retirement_limit,
-              self.config.db_path, self.config.db_name, self.timeout,
-              self.last_id, json.dumps(list(self.seen))))
+               self.dump_config())
     
     conn.commit()
     conn.close()
@@ -369,6 +376,18 @@ class SWAP(object):
           user_id = row['user_name']
         subject_id = int(row['subject_ids'])
         annotation = json.loads(row['annotations'])
+        try:
+          assert int(row['workflow_id']) == self.config.workflow
+          # ignore repeat classifications of the same subject
+          if json.loads(row['metadata'])['seen_before']:
+            continue
+        except KeyError as e:
+          print(e, row)
+          pass
+        except AssertionError as e:
+          print(e, row)
+          continue
+                  
         try:
           cl = Classification(id,
                               user_id,
