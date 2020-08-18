@@ -1,12 +1,9 @@
 from swap import SWAP
-
-from config import Config
-from offline_config import Config as OfflineConfig
-from online_config import Config as OnlineConfig
+from kswap import kSWAP
 
 def test_initialise():
+  from config import Config
   swap = SWAP(config=Config())
-  swap.save()
   swap = swap.load()
   swap.get_golds('./data/supernova-hunters-gold-labels.csv')
   swap.apply_golds('./data/supernova-hunters-classifications.csv')
@@ -16,37 +13,71 @@ def test_initialise():
   swap = SWAP(config=Config())
   swap = swap.load()
 
-def test_offline():
-  swap = SWAP(config=OfflineConfig())
+def test_kswap_initialise():
+  from kswap_config import Config
+  swap = kSWAP(config=Config())
+  swap = swap.load()
+  swap.get_golds('./data/kswap-demo-gold-labels.csv')
+  swap.apply_golds('./data/kswap-demo-classifications.csv')
+  swap.process_classifications_from_csv_dump('./data/kswap-demo-classifications.csv')
   swap.save()
+  del swap
+  swap = kSWAP(config=Config())
+  swap = swap.load()
+
+def test_offline():
+  from offline_config import Config
+  swap = SWAP(config=Config())
   swap = swap.load()
   swap.run_offline('./data/supernova-hunters-gold-labels.csv',
                    './data/supernova-hunters-example-classifications.csv')
   swap.save()
   del swap
-  swap = SWAP(config=OfflineConfig())
+  swap = SWAP(config=Config())
+  swap = swap.load()
+
+def test_kswap_offline():
+  from kswap_offline_config import Config
+  swap = kSWAP(config=Config())
+  swap = swap.load()
+  swap.run_offline('./data/kswap-demo-gold-labels.csv',
+                   './data/kswap-demo-classifications.csv')
   swap.save()
+  del swap
+  swap = kSWAP(config=Config())
   swap = swap.load()
 
 def test_online():
-  swap = SWAP(config=OnlineConfig())
-  swap.save()
+  from online_config import Config
+  swap = SWAP(config=Config())
   swap = swap.load()
   swap.run_online('./data/supernova-hunters-gold-labels.csv',
                   './data/supernova-hunters-example-classifications.csv')
   swap.save()
   del swap
-  swap = SWAP(config=OnlineConfig())
+  swap = SWAP(config=Config())
+  swap = swap.load()
+
+def test_kswap_online():
+  from kswap_online_config import Config
+  swap = kSWAP(config=Config())
+  swap = swap.load()
+  swap.run_online('./data/kswap-demo-gold-labels.csv',
+                   './data/kswap-demo-classifications.csv')
   swap.save()
+  del swap
+  swap = kSWAP(config=Config())
   swap = swap.load()
 
 def compare_offline_and_online_user_scores(user_id):
   import matplotlib.pyplot as plt
   
+  from offline_config import Config as OfflineConfig
   offline_swap = SWAP(config=OfflineConfig())
   offline_swap = offline_swap.load()
   offline_user = offline_swap.users[user_id]
   
+  from online_config import Config as OnlineConfig
   online_swap = SWAP(config=OnlineConfig())
   online_swap = online_swap.load()
   online_user = online_swap.users[user_id]
@@ -81,12 +112,80 @@ def compare_offline_and_online_user_scores(user_id):
   plt.legend(loc='best')
   plt.show()
 
-def main():
-  #test_initialise()
-  test_offline()
-  test_online()
+def compare_kswap_offline_and_online_user_scores(user_id):
+  import matplotlib.pyplot as plt
+  
+  from kswap_offline_config import Config as OfflineConfig
+  offline_swap = kSWAP(config=OfflineConfig())
+  offline_swap = offline_swap.load()
+  offline_user = offline_swap.users[user_id]
+  
+  from kswap_online_config import Config as OnlineConfig
+  online_swap = kSWAP(config=OnlineConfig())
+  online_swap = online_swap.load()
+  online_user = online_swap.users[user_id]
 
-  compare_offline_and_online_user_scores(user_id=1)
+  print(len(offline_user.history), len(online_user.history))
+  print(offline_user.confusion_matrix, online_user.confusion_matrix)
+  print(offline_user.user_score, online_user.user_score)
+  assert len(offline_user.history) == len(online_user.history)
+  
+  plt.plot(range(len(offline_user.history)),
+           [h[1]['0'][0] for h in offline_user.history],
+           color='#26547C',
+           label='\'0\' offline')
+  plt.plot(range(len(offline_user.history)),
+           [h[1]['1'][1] for h in offline_user.history],
+           color='#EF476F',
+           label='\'1\' offline')
+  plt.plot(range(len(offline_user.history)),
+           [h[1]['2'][2] for h in offline_user.history],
+           color='#26C485',
+           label='\'2\' offline')
+  plt.plot(range(len(online_user.history)),
+           [h[1]['0'][0] for h in online_user.history],
+           color='#26547C',
+           ls='--',
+           label='\'0\' online')
+  plt.plot(range(len(online_user.history)),
+           [h[1]['1'][1] for h in online_user.history],
+           color='#EF476F',
+           ls='--',
+           label='\'1\' online')
+  plt.plot(range(len(online_user.history)),
+           [h[1]['2'][2] for h in online_user.history],
+           color='#26C485',
+           ls='--',
+           label='\'2\' online')
+  plt.plot(range(len(online_user.history)),
+           [0.5 for h in online_user.history],
+           color='k',
+           ls='--',
+           lw=2,
+           label='demo competence')
+           
+  plt.xlim(0,len(offline_user.history))
+  plt.ylim(0,1)
+  plt.xlabel('number of classifications')
+  plt.ylabel('user score')
+  plt.legend(loc='best')
+  plt.show()
+
+def main():
+
+  ### SWAP tests
+  #test_initialise()
+  #test_offline()
+  #test_online()
+
+  #compare_offline_and_online_user_scores(user_id=1)
+
+  ### kSWAP tests
+  test_kswap_initialise()
+  test_kswap_offline()
+  test_kswap_online()
+
+  compare_kswap_offline_and_online_user_scores(user_id=1)
 
 if __name__ == '__main__':
   main()
