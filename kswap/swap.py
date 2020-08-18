@@ -230,7 +230,6 @@ class SWAP(object):
     c.executemany('INSERT OR REPLACE INTO subjects VALUES (?,?,?,?,?,?,?)',
                    self.dump_subjects())
                    
-    print(self.dump_config())
     c.execute('INSERT OR REPLACE INTO config VALUES (?,?,?,?,?,?,?,?,?,?,?)',
                self.dump_config())
     
