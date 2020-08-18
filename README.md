@@ -1,5 +1,5 @@
 # kSWAP
-General implementation of SWAP for Zooniverse projects.  This implementation extends SWAP (for binary tasks) to k-classes.
+General implementation of SWAP for Zooniverse projects.  This implementation extends SWAP (for binary tasks) to k-classes (kSWAP).
 
 ## Requirements
 
@@ -23,5 +23,7 @@ will run tests of offline and a simulation of online SWAP and kSWAP.  It will al
 
 ## Notes
 The example config files allow for some customisation.  They are currently implemented for the [Supernova Hunters](https://www.zooniverse.org/projects/dwright04/supernova-hunters) citizen science project, where volunteers are asked a binary question with a yes or no response.
+![alt text](https://github.com/dr-darryl-wright/kSWAP/blob/master/swap_example_volunteer_history.png)
 
 The kSWAP tests use artificially generated data where simulated volunteers annotations '0', '1' or '2'.  The ```generate_kswap_demo_data.py``` script allows the competence of these simulated volunteers to be altered.
+![alt text](https://github.com/dr-darryl-wright/kSWAP/blob/master/kswap_example_volunteer_history.png)
