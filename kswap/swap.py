@@ -3,6 +3,8 @@ import csv
 import json
 import sqlite3
 
+from collections import Counter
+
 class Classification(object):
   def __init__(self,
                id,
@@ -31,11 +33,13 @@ class User(object):
   def __init__(self,
                user_id,
                classes,
+               gamma,
                user_default=None):
 
     self.user_id = user_id
     self.classes = classes
     self.k = len(classes)
+    self.gamma = gamma
     if user_default:
       self.user_score = user_default
     else:
@@ -50,7 +54,29 @@ class User(object):
     self.user_score = {}
     for i in range(self.k):
       self.user_score[self.classes[i]] = 1 / float(self.k)
-  
+
+  def update_confusion_matrix(self, gold_label, label):
+    confusion_matrix = self.confusion_matrix
+    confusion_matrix['n_gold'][gold_label] += 1
+    if gold_label == label:
+      confusion_matrix['n_seen'][label] += 1
+    self.confusion_matrix = confusion_matrix
+
+  def update_user_score(self, gold_label, label):
+    self.update_confusion_matrix(gold_label, label)
+    try:
+      score0 = (self.confusion_matrix['n_seen'][0] + self.gamma) \
+             / (self.confusion_matrix['n_gold'][0] + 2.0*self.gamma)
+    except ZeroDivisionError:
+      score0 = self.user_default[self.classes[0]]
+    try:
+      score1 = (self.confusion_matrix['n_seen'][1] + self.gamma) \
+             / (self.confusion_matrix['n_gold'][1] + 2.0*self.gamma)
+    except ZeroDivisionError:
+      score1 = self.user_default[self.classes[1]]
+
+    self.user_score = {self.classes[0]: score0, self.classes[1]: score1}
+
   def dump(self):
     return (self.user_id,
             json.dumps(self.user_score),
@@ -149,6 +175,7 @@ class SWAP(object):
       user_score = json.loads(user['user_score'])
       self.users[user['user_id']] = User(user_id=user['user_id'],
                                          classes=self.config.classes,
+                                         gamma=self.config.gamma,
                                          user_default=user_score)
       self.users[user['user_id']].confusion_matrix = json.loads(user['confusion_matrix'])
       self.users[user['user_id']].history = json.loads(user['history'])
@@ -246,6 +273,7 @@ class SWAP(object):
     except KeyError:
       self.users[cl.user_id] = User(user_id = cl.user_id,
                                     classes = self.config.classes,
+                                    gamma   = self.config.gamma,
                                     user_default = self.config.user_default)
     # check subject is known
     try:
@@ -260,20 +288,21 @@ class SWAP(object):
 
     if self.subjects[cl.subject_id].gold_label in (0,1) and online:
       gold_label = self.subjects[cl.subject_id].gold_label
-      confusion_matrix = self.users[cl.user_id].confusion_matrix
-      confusion_matrix['n_gold'][gold_label] += 1
-      if gold_label == cl.label:
-        confusion_matrix['n_seen'][cl.label] += 1
-      try:
-        score0=(confusion_matrix['n_seen'][0] + self.config.gamma) / (confusion_matrix['n_gold'][0] + 2.0*self.config.gamma)
-      except ZeroDivisionError:
-        score0=self.user_default[self.config.classes[0]]
-      try:
-        score1=(confusion_matrix['n_seen'][1] + self.config.gamma) / (confusion_matrix['n_gold'][1] + 2.0*self.config.gamma)
-      except ZeroDivisionError:
-        score1=self.user_default[self.config.classes[1]]
-
-      self.users[cl.user_id].user_score = {self.config.classes[0]: score0, self.config.classes[1]: score1}
+      #confusion_matrix = self.users[cl.user_id].confusion_matrix
+      #confusion_matrix['n_gold'][gold_label] += 1
+      #if gold_label == cl.label:
+      #  confusion_matrix['n_seen'][cl.label] += 1
+      #try:
+      #  score0=(confusion_matrix['n_seen'][0] + self.config.gamma) / (confusion_matrix['n_gold'][0] + 2.0*self.config.gamma)
+      #except ZeroDivisionError:
+      #  score0=self.user_default[self.config.classes[0]]
+      #try:
+      #  score1=(confusion_matrix['n_seen'][1] + self.config.gamma) / (confusion_matrix['n_gold'][1] + 2.0*self.config.gamma)
+      #except ZeroDivisionError:
+      #  score1=self.user_default[self.config.classes[1]]
+      #
+      #self.users[cl.user_id].user_score = {self.config.classes[0]: score0, self.config.classes[1]: score1}
+      self.users[cl.user_id].update_user_score(gold_label, cl.label)
     self.users[cl.user_id].history.append((cl.subject_id, self.users[cl.user_id].user_score))
     self.last_id = cl.id
     self.seen.add(cl.id)
@@ -400,25 +429,27 @@ class SWAP(object):
         except KeyError:
           self.users[cl.user_id] = User(user_id = cl.user_id,
                                         classes = self.config.classes,
+                                        gamma   = self.config.gamma,
                                         user_default = self.config.user_default)
         
         try:
           gold_label = self.subjects[cl.subject_id].gold_label
-          confusion_matrix = self.users[cl.user_id].confusion_matrix
+          #confusion_matrix = self.users[cl.user_id].confusion_matrix
           assert gold_label in (0,1)
-          confusion_matrix['n_gold'][gold_label] += 1
-          if gold_label == cl.label:
-            confusion_matrix['n_seen'][cl.label] += 1
-          try:
-            score0=(confusion_matrix['n_seen'][0] + self.config.gamma) / (confusion_matrix['n_gold'][0] + 2.0*self.config.gamma)
-          except ZeroDivisionError:
-            score0=self.config.user_default[self.config.classes[0]]
-          try:
-            score1=(confusion_matrix['n_seen'][1] + self.config.gamma) / (confusion_matrix['n_gold'][1] + 2.0*self.config.gamma)
-          except ZeroDivisionError:
-            score1=self.config.user_default[self.config.classes[1]]
+          #confusion_matrix['n_gold'][gold_label] += 1
+          #if gold_label == cl.label:
+          #  confusion_matrix['n_seen'][cl.label] += 1
+          #try:
+          #  score0=(confusion_matrix['n_seen'][0] + self.config.gamma) / (confusion_matrix['n_gold'][0] + 2.0*self.config.gamma)
+          #except ZeroDivisionError:
+          #  score0=self.config.user_default[self.config.classes[0]]
+          #try:
+          #  score1=(confusion_matrix['n_seen'][1] + self.config.gamma) / (confusion_matrix['n_gold'][1] + 2.0*self.config.gamma)
+          #except ZeroDivisionError:
+          #  score1=self.config.user_default[self.config.classes[1]]
 
-          self.users[cl.user_id].user_score = {self.config.classes[0]: score0, self.config.classes[1]: score1}
+          #self.users[cl.user_id].user_score = {self.config.classes[0]: score0, self.config.classes[1]: score1}
+          self.users[cl.user_id].update_user_score(gold_label, cl.label)
         except AssertionError as e:
           continue
         except KeyError as e:
