@@ -82,14 +82,13 @@ class Subject(object):
     self.history = [('_', '_', '_', self.score)]
 
   def update_score(self, label, user):
-    score = {'0': None, '1': None, '2': None}
+    score = {c: None for c in self.classes}
     print(self.score)
     print(user.user_score)
     denomenator = sum([user.user_score[c][label] * self.score[c] \
                        for c in self.classes])
                        
     for c in self.classes:
-      #c_index = self.classes.index(c)
       numerator = (self.score[c] *  user.user_score[c][label])
       score[c] = numerator / (denomenator + self.epsilon)
 
@@ -239,9 +238,6 @@ class kSWAP(object):
     conn.close()
 
   def process_classification(self, cl, online=False):
-    # check if classification already seen
-    #if cl.id <= self.last_id:
-    #  return
     # check user is known
     try:
       self.users[cl.user_id]
@@ -263,22 +259,6 @@ class kSWAP(object):
     if self.subjects[cl.subject_id].gold_label in self.config.label_map.values() and online:
       gold_label = self.subjects[cl.subject_id].gold_label
       assert gold_label in self.config.label_map.values()
-      #confusion_matrix = self.users[cl.user_id].confusion_matrix
-      #confusion_matrix['n_gold'][gold_label] += 1
-      #confusion_matrix['matrix'][gold_label][cl.label] += 1
-      #self.users[cl.user_id].update_confusion_matrix(gold_label, cl.label)
-      #print(cl.subject_id, cl.user_id, gold_label, cl.label, self.users[cl.user_id].user_score.keys())
-      
-      #user_score = {}
-      #for i, c_i in enumerate(self.config.classes):
-      #  user_score[c_i] = [None] * len(self.config.classes)
-      #  for j, c_j in enumerate(self.config.classes):
-      #    user_score[c_i][j] = (confusion_matrix['matrix'][i][j] \
-      #                       +  self.config.gamma) \
-      #                       / (confusion_matrix['n_gold'][i] \
-      #                       +  2.0 \
-      #                       *  self.config.gamma)
-      #self.users[cl.user_id].user_score = user_score
       self.users[cl.user_id].update_user_score(gold_label, cl.label)
     self.users[cl.user_id].history.append((cl.subject_id, self.users[cl.user_id].user_score))
     self.last_id = cl.id
@@ -415,23 +395,6 @@ class kSWAP(object):
         try:
           gold_label = self.subjects[cl.subject_id].gold_label
           assert gold_label in self.config.label_map.values()
-          #confusion_matrix = self.users[cl.user_id].confusion_matrix
-          #confusion_matrix['n_gold'][gold_label] += 1
-          #confusion_matrix['matrix'][gold_label][cl.label] += 1
-          
-          #self.users[cl.user_id].update_confusion_matrix(gold_label, cl.label)
-        
-          #user_score = {}
-          #for i, c_i in enumerate(self.config.classes):
-          #  user_score[c_i] = [None] * len(self.config.classes)
-          #  for j, c_j in enumerate(self.config.classes):
-          #    user_score[c_i][j] = (confusion_matrix['matrix'][i][j] \
-          #                       +  self.config.gamma) \
-          #                       / (confusion_matrix['n_gold'][i] \
-          #                       +  2.0 \
-          #                       *  self.config.gamma)
-          #
-          #self.users[cl.user_id].user_score = user_score
           self.users[cl.user_id].update_user_score(gold_label, cl.label)
         except AssertionError as e:
           print(e)
