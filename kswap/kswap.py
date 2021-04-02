@@ -25,7 +25,7 @@ class User(object):
     self.history = [('_', self.user_score)]
 
   def initialise_confusion_matrix(self):
-    self.confusion_matrix = {'matrix':  [[0]*self.k, [0]*self.k, [0]*self.k],
+    self.confusion_matrix = {'matrix':  [[0]*self.k for i in range(self.k)],
                              'n_gold':  [0]*self.k
                             }
 
@@ -85,6 +85,7 @@ class Subject(object):
     score = {c: None for c in self.classes}
     print(self.score)
     print(user.user_score)
+    print(label)
     denomenator = sum([user.user_score[c][label] * self.score[c] \
                        for c in self.classes])
                        
