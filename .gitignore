@@ -128,7 +128,5 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-*~
+#sqlite3 databases
 *.db
-.DS_Store
-tmp/
