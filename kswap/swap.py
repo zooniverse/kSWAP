@@ -288,20 +288,6 @@ class SWAP(object):
 
     if self.subjects[cl.subject_id].gold_label in (0,1) and online:
       gold_label = self.subjects[cl.subject_id].gold_label
-      #confusion_matrix = self.users[cl.user_id].confusion_matrix
-      #confusion_matrix['n_gold'][gold_label] += 1
-      #if gold_label == cl.label:
-      #  confusion_matrix['n_seen'][cl.label] += 1
-      #try:
-      #  score0=(confusion_matrix['n_seen'][0] + self.config.gamma) / (confusion_matrix['n_gold'][0] + 2.0*self.config.gamma)
-      #except ZeroDivisionError:
-      #  score0=self.user_default[self.config.classes[0]]
-      #try:
-      #  score1=(confusion_matrix['n_seen'][1] + self.config.gamma) / (confusion_matrix['n_gold'][1] + 2.0*self.config.gamma)
-      #except ZeroDivisionError:
-      #  score1=self.user_default[self.config.classes[1]]
-      #
-      #self.users[cl.user_id].user_score = {self.config.classes[0]: score0, self.config.classes[1]: score1}
       self.users[cl.user_id].update_user_score(gold_label, cl.label)
     self.users[cl.user_id].history.append((cl.subject_id, self.users[cl.user_id].user_score))
     self.last_id = cl.id
@@ -382,6 +368,58 @@ class SWAP(object):
     except TypeError:
       self.retire_classification_count(self.subjects.keys())
 
+  def caesar_recieve(self, ce):
+    data = ce.Extractor.next()
+    haveItems = False
+    subject_batch = []
+    for i, item in enumerate(data):
+      haveItems = True
+      self.logger.write(str(item) + '\n')
+      id = int(item['classification_id'])
+      try:
+        # ignore repeat classifications of the same subject
+        if item['already_seen']:
+          continue
+      except KeyError as e:
+        print('KeyError', e)
+        continue
+      if id < self.last_id:
+        continue
+      try:
+        user_id = int(item['user_id'])
+      except ValueError:
+        user_id = item['user_id']
+      subject_id = int(item['subject_ids'])
+      object_id = item['object_id']
+      annotation = ujson.loads(item['annotations'])
+      cl = Classification(id, user_id, subject_id, object_id, annotation)
+      self.process_classification(cl)
+      self.last_id = id
+      self.seen.add(id)
+      subject_batch.append(subject_id)
+    self.logger.write(str(subject_batch)+'\n')
+    return haveItems, subject_batch
+    
+  def process_classifications_from_caesar(self, caesar_config_name):
+    ce.Config.load(caesar_config_name)
+    try:
+      while True:
+        haveItems, subject_batch = self.caesar_recieve(ce)
+        print(haveItems, subject_batch)
+        if haveItems:
+          self.save()
+          ce.Config.instance().save()
+          # load the just saved ce config
+          ce.Config.load(caesar_config_name)
+          self.send(ce, subject_batch)
+    except KeyboardInterrupt as e:
+      print('Received KeyboardInterrupt {}'.format(e))
+      self.logger.write('Received KeyboardInterrupt {}'.format(e)+'\n')
+      self.save()
+      print('Terminating SWAP instance.')
+      self.logger.write('Terminating SWAP instance.\n')
+      exit()
+
   def get_golds(self, path):
     with open(path,'r') as csvdump:
       reader = csv.DictReader(csvdump)
@@ -434,21 +472,7 @@ class SWAP(object):
         
         try:
           gold_label = self.subjects[cl.subject_id].gold_label
-          #confusion_matrix = self.users[cl.user_id].confusion_matrix
           assert gold_label in (0,1)
-          #confusion_matrix['n_gold'][gold_label] += 1
-          #if gold_label == cl.label:
-          #  confusion_matrix['n_seen'][cl.label] += 1
-          #try:
-          #  score0=(confusion_matrix['n_seen'][0] + self.config.gamma) / (confusion_matrix['n_gold'][0] + 2.0*self.config.gamma)
-          #except ZeroDivisionError:
-          #  score0=self.config.user_default[self.config.classes[0]]
-          #try:
-          #  score1=(confusion_matrix['n_seen'][1] + self.config.gamma) / (confusion_matrix['n_gold'][1] + 2.0*self.config.gamma)
-          #except ZeroDivisionError:
-          #  score1=self.config.user_default[self.config.classes[1]]
-
-          #self.users[cl.user_id].user_score = {self.config.classes[0]: score0, self.config.classes[1]: score1}
           self.users[cl.user_id].update_user_score(gold_label, cl.label)
         except AssertionError as e:
           continue
