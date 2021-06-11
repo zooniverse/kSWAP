@@ -399,13 +399,13 @@ def main():
   ### 5SWAP example
   #test_5swap_initialise()
   #test_5swap_offline()
-  #test_5swap_online()
+  test_5swap_online()
 
   #compare_5swap_offline_and_online_user_scores(user_id=7)
 
   ### Daniel's example
-  test_daniels_online()
-  plot_daniels_online(1)
+  #test_daniels_online()
+  #plot_daniels_online(1)
 
 if __name__ == '__main__':
   main()
