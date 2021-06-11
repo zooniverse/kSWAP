@@ -148,7 +148,7 @@ class kSWAP(object):
     for user in users:
       user_score = json.loads(user['user_score'])
       self.users[user['user_id']] = User(user_id=user['user_id'],
-                                         classes=self.config.classes,
+                                         classes=self.config.label_map.keys(),
                                          gamma=self.config.gamma,
                                          user_default=user_score)
       self.users[user['user_id']].confusion_matrix = json.loads(user['confusion_matrix'])
@@ -157,7 +157,7 @@ class kSWAP(object):
   def load_subjects(self, subjects):
     for subject in subjects:
       self.subjects[subject['subject_id']] = Subject(subject_id=subject['subject_id'],
-                                                     classes=self.config.classes,
+                                                     classes=self.config.label_map.keys(),
                                                      p0=self.config.p0)
       self.subjects[subject['subject_id']].score = subject['score']
       self.subjects[subject['subject_id']].gold_label = subject['gold_label']
@@ -244,7 +244,7 @@ class kSWAP(object):
       self.users[cl.user_id]
     except KeyError:
       self.users[cl.user_id] = User(user_id = cl.user_id,
-                                    classes = self.config.classes,
+                                    classes = self.config.label_map.keys(),
                                     gamma   = self.config.gamma,
                                     user_default = self.config.user_default)
     # check subject is known
@@ -253,7 +253,7 @@ class kSWAP(object):
     except KeyError:
       self.subjects[cl.subject_id] = Subject(subject_id = cl.subject_id,
                                              p0 = self.config.p0,
-                                             classes = self.config.classes)
+                                             classes = self.config.label_map.keys())
                                              
     self.subjects[cl.subject_id].update_score(cl.label, self.users[cl.user_id])
     
@@ -349,7 +349,7 @@ class kSWAP(object):
         subject_id = int(row['subject_id'])
         gold_label = int(row['gold'])
         self.subjects[subject_id] = Subject(subject_id,
-                                            classes = self.config.classes,
+                                            classes = self.config.label_map.keys(),
                                             p0 = self.config.p0,
                                             gold_label = gold_label)
 
@@ -389,7 +389,7 @@ class kSWAP(object):
           self.users[cl.user_id]
         except KeyError:
           self.users[cl.user_id] = User(user_id = cl.user_id,
-                                        classes = self.config.classes,
+                                        classes = self.config.label_map.keys(),
                                         gamma   = self.config.gamma,
                                         user_default = self.config.user_default)
         
