@@ -273,17 +273,15 @@ class kSWAP(object):
       except KeyError:
         print('Subject {} is missing.'.format(subject_id))
         continue
-      if subject.gold_label in (0,1):
+      if subject.gold_label in self.config.label_map.keys():
         # if this is a gold standard image never retire
         continue
-      if subject.score < self.config.thresholds[0]:
-        subject.retired = True
-        subject.retired_as = 0
-        to_retire.append(subject_id)
-      elif subject.score > self.config.thresholds[1]:
-        subject.retired = True
-        subject.retired_as = 1
-        to_retire.append(subject_id)
+      for c in self.config.label_map.keys():
+        label = self.config.label_map[c]
+        if subject.score[c] < self.config.thresholds[label]:
+          subject.retired = True
+          subject.retired_as = label
+          to_retire.append(subject_id)
     return to_retire
     
   def retire_classification_count(self, subject_batch):
