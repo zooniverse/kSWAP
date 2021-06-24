@@ -125,6 +125,11 @@ class kSWAP(object):
     except sqlite3.OperationalError:
       self.db_exists = True
 
+    Panoptes.connect(username=os.environ["PANOPTES_USERNAME"], \
+                     password=os.environ["PANOPTES_PASSWORD"])
+                     
+    self.workflow = Workflow.find(config.workflow_id)
+    
   def connect_db(self):
     return sqlite3.connect(self.config.db_path+self.config.db_name, timeout=self.timeout)
 
@@ -302,7 +307,13 @@ class kSWAP(object):
         subject.retired_as = majority_vote([h[2] for h in subject.history])
         to_retire.append(subject_id)
     return to_retire
-
+ 
+  def send_panoptes(self, subject_batch):
+    subjects = []
+    for subject_id in subject_batch:
+      subjects.append(PanoptesSubject().find(subject_id))
+    self.workflow.retire_subjects(subjects)
+ 
   def process_classifications_from_csv_dump(self, path, online=False):
     with open(path, 'r') as csvdump:
       reader = csv.DictReader(csvdump)
@@ -336,9 +347,10 @@ class kSWAP(object):
           continue
         self.process_classification(cl, online)
     try:
-      self.retire(self.subjects.keys())
+      to_retire = self.retire(self.subjects.keys())
     except TypeError:
-      self.retire_classification_count(self.subjects.keys())
+      to_retire = self.retire_classification_count(self.subjects.keys())
+    self.send_panoptes(to_retire)
 
   def get_golds(self, path):
     with open(path,'r') as csvdump:
