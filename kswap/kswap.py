@@ -7,6 +7,10 @@ from collections import Counter
 
 from swap import Classification
 
+from panoptes_client import Panoptes, Workflow
+from panoptes_client import Subject as PanoptesSubject
+from panoptes_client.panoptes import PanoptesAPIException
+
 class User(object):
   def __init__(self,
                user_id,
@@ -271,6 +275,11 @@ class kSWAP(object):
     self.seen.add(cl.id)
 
   def retire(self, subject_batch):
+      
+    def majority_vote(sequence):
+      occurence_count = Counter(sequence)
+      return occurence_count.most_common(1)[0][0]
+    
     to_retire = []
     for subject_id in subject_batch:
       try:
@@ -287,25 +296,11 @@ class kSWAP(object):
           subject.retired = True
           subject.retired_as = label
           to_retire.append(subject_id)
-    return to_retire
-    
-  def retire_classification_count(self, subject_batch):
-  
-    def majority_vote(sequence):
-      occurence_count = Counter(sequence)
-      return occurence_count.most_common(1)[0][0]
-    
-    to_retire = []
-    for subject_id in subject_batch:
-      try:
-        subject = self.subjects[subject_id]
-      except KeyError:
-        print('Subject {} is missing.'.format(subject_id))
-        continue
       if subject.seen >= self.config.retirement_limit:
         subject.retired = True
         subject.retired_as = majority_vote([h[2] for h in subject.history])
         to_retire.append(subject_id)
+        
     return to_retire
  
   def send_panoptes(self, subject_batch):
@@ -346,10 +341,8 @@ class kSWAP(object):
           print(e)
           continue
         self.process_classification(cl, online)
-    try:
-      to_retire = self.retire(self.subjects.keys())
-    except TypeError:
-      to_retire = self.retire_classification_count(self.subjects.keys())
+
+    to_retire = self.retire(self.subjects.keys())
     self.send_panoptes(to_retire)
 
   def get_golds(self, path):
