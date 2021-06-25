@@ -132,7 +132,7 @@ class kSWAP(object):
     Panoptes.connect(username=os.environ["PANOPTES_USERNAME"], \
                      password=os.environ["PANOPTES_PASSWORD"])
                      
-    self.workflow = Workflow.find(config.workflow_id)
+    self.workflow = Workflow.find(config.workflow)
     
   def connect_db(self):
     return sqlite3.connect(self.config.db_path+self.config.db_name, timeout=self.timeout)
