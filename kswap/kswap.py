@@ -11,6 +11,11 @@ from panoptes_client import Panoptes, Workflow
 from panoptes_client import Subject as PanoptesSubject
 from panoptes_client.panoptes import PanoptesAPIException
 
+try:
+    import caesar_external as ce
+except ModuleNotFoundError:
+    pass
+
 class User(object):
   def __init__(self,
                user_id,
@@ -123,6 +128,7 @@ class kSWAP(object):
     self.seen = set([])
     self.db_exists = False
     self.timeout = timeout # wait x seconds to acquire db connection
+    
     try:
       self.create_db()
       self.save()
@@ -344,6 +350,58 @@ class kSWAP(object):
 
     to_retire = self.retire(self.subjects.keys())
     self.send_panoptes(to_retire)
+
+  def caesar_recieve(self, ce):
+    data = ce.Extractor.next()
+    haveItems = False
+    subject_batch = []
+    for i, item in enumerate(data):
+      haveItems = True
+      self.logger.write(str(item) + '\n')
+      id = int(item['classification_id'])
+      try:
+        # ignore repeat classifications of the same subject
+        if item['already_seen']:
+          continue
+      except KeyError as e:
+        print('KeyError', e)
+        continue
+      if id < self.last_id:
+        continue
+      try:
+        user_id = int(item['user_id'])
+      except ValueError:
+        user_id = item['user_id']
+      subject_id = int(item['subject_ids'])
+      object_id = item['object_id']
+      annotation = ujson.loads(item['annotations'])
+      cl = Classification(id, user_id, subject_id, object_id, annotation)
+      self.process_classification(cl)
+      self.last_id = id
+      self.seen.add(id)
+      subject_batch.append(subject_id)
+    self.logger.write(str(subject_batch)+'\n')
+    return haveItems, subject_batch
+    
+  def process_classifications_from_caesar(self, caesar_config_name):
+    ce.Config.load(caesar_config_name)
+    try:
+      while True:
+        haveItems, subject_batch = self.caesar_recieve(ce)
+        print(haveItems, subject_batch)
+        if haveItems:
+          self.save()
+          ce.Config.instance().save()
+          # load the just saved ce config
+          ce.Config.load(caesar_config_name)
+          self.send(ce, subject_batch)
+    except KeyboardInterrupt as e:
+      print('Received KeyboardInterrupt {}'.format(e))
+      self.logger.write('Received KeyboardInterrupt {}'.format(e)+'\n')
+      self.save()
+      print('Terminating SWAP instance.')
+      self.logger.write('Terminating SWAP instance.\n')
+      exit()
 
   def get_golds(self, path):
     with open(path,'r') as csvdump:

@@ -5,6 +5,15 @@ import sqlite3
 
 from collections import Counter
 
+from panoptes_client import Panoptes, Workflow
+from panoptes_client import Subject as PanoptesSubject
+from panoptes_client.panoptes import PanoptesAPIException
+
+try:
+    import caesar_external as ce
+except ModuleNotFoundError:
+    pass
+    
 class Classification(object):
   def __init__(self,
                id,
@@ -150,7 +159,12 @@ class SWAP(object):
       self.save()
     except sqlite3.OperationalError:
       self.db_exists = True
-      
+
+    Panoptes.connect(username=os.environ["PANOPTES_USERNAME"], \
+                     password=os.environ["PANOPTES_PASSWORD"])
+                     
+    self.workflow = Workflow.find(config.workflow_id)
+    
   def connect_db(self):
     return sqlite3.connect(self.config.db_path+self.config.db_name, timeout=self.timeout)
 
@@ -332,6 +346,12 @@ class SWAP(object):
         subject.retired_as = majority_vote([h[2] for h in subject.history])
         to_retire.append(subject_id)
     return to_retire
+
+  def send_panoptes(self, subject_batch):
+    subjects = []
+    for subject_id in subject_batch:
+      subjects.append(PanoptesSubject().find(subject_id))
+    self.workflow.retire_subjects(subjects)
 
   def process_classifications_from_csv_dump(self, path, online=False):
     with open(path, 'r') as csvdump:
